@@ -1,13 +1,9 @@
 import pygame
 import sys
 import random
+import asyncio
 
 pygame.init()
-
-
-def update_screen():
-    pygame.display.flip()
-    pygame.time.Clock().tick(60)
 
 
 def draw_screen():
@@ -52,16 +48,19 @@ def spawn_bricks():
 
 
 def ball_movement():
-    global ball_speed, ball_speed_x, ball_speed_y, score_m1, ball_direction, num_of_collisions, last
+    global ball_speed, ball_speed_x, ball_speed_y, score_m1, ball_direction, num_of_collisions, last, now, \
+        cooldown_wall_col
     ball.x += ball_speed_x * ball_direction
     ball.y += ball_speed_y
     # collision with walls
-    if ball.left <= WALL_WIDTH or ball.right >= WIDTH - WALL_WIDTH:
-        bounce_sound_effect.play()
+    if ball.left <= WALL_WIDTH or ball.right >= WIDTH - WALL_WIDTH and cooldown_wall_col <= 0:
         ball_speed_x *= -1
-    if ball.top <= TOPPER:
         bounce_sound_effect.play()
+        cooldown_wall_col = 50
+    if ball.top <= TOPPER:
         ball_speed_y *= -1
+        bounce_sound_effect.play()
+    cooldown_wall_col -= 1
     # collision with paddle
     if ball.colliderect(paddle):
         if now - last >= COOLDOWN:
@@ -198,6 +197,7 @@ hit_orange = False
 hit_red = False
 last = 0
 COOLDOWN = 600
+cooldown_wall_col = 50
 
 # Bricks
 BRICK_ROWS = 8
@@ -217,40 +217,44 @@ match = 1
 deaths = 0
 players = 1
 
-# main loop
-while running:
-    now = pygame.time.get_ticks()
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-    # player movement
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT] and paddle.left > (WALL_WIDTH * 2):
-        paddle.x -= paddle_speed
-    if keys[pygame.K_RIGHT] and paddle.right < WIDTH - (WALL_WIDTH * 2):
-        paddle.x += paddle_speed
 
-    # ball movement and collision
-    ball_movement()
-    # scoring system
-    ball_punches_brick(match)
-    scoring_matches()
-    # create bricks
-    spawn_bricks()
-    # Check if the ball missed the paddle
-    restore_ball()
+async def main():
+    global running, now
+    # main loop
+    while running:
+        now = pygame.time.get_ticks()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+        # player movement
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT] and paddle.left > (WALL_WIDTH * 2):
+            paddle.x -= paddle_speed
+        if keys[pygame.K_RIGHT] and paddle.right < WIDTH - (WALL_WIDTH * 2):
+            paddle.x += paddle_speed
 
-    # Draw everything
-    draw_screen()
-    # update screen
-    update_screen()
+        # ball movement and collision
+        ball_movement()
+        # scoring system
+        ball_punches_brick(match)
+        scoring_matches()
+        # create bricks
+        spawn_bricks()
+        # Check if the ball missed the paddle
+        restore_ball()
 
-    # show end screen
-    end_screen()
+        # Draw everything
+        draw_screen()
+        # show end screen
+        end_screen()
 
-# End of game
-pygame.display.flip()
-pygame.time.delay(3000)
+        # update screen
+        pygame.display.flip()
+        pygame.time.Clock().tick(60)
+        await asyncio.sleep(0)
 
-pygame.quit()
-sys.exit()
+asyncio.run(main())
